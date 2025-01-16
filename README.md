@@ -25,7 +25,7 @@ sudo apt install docker.io
 sudo systemctl start docker
 sudo systemctl enable docker
 ```
-Hoặc đơn giản hơn có thể tải file Labtair Labtainer cài đặt trên VMWARE: 
+Hoặc đơn giản hơn có thể tải file Labtainer cài đặt trên VMWARE: 
 ```bash
  https://nps.box.com/shared/static/2chwo31xgxm2hs4hewp2n4nblroyagwz.ova
 ```
