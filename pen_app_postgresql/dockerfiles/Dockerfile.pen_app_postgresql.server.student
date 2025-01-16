@@ -1,0 +1,72 @@
+#
+# Labtainer Dockerfile
+#
+#  This is the default Labtainer Dockerfile template, please choose the appropriate
+#  base image below.
+#
+ARG registry
+FROM $registry/labtainer.base2
+#FROM $registry/labtainer.network
+#FROM $registry/labtainer.centos
+#FROM $registry/labtainer.lamp
+#
+ARG lab
+ARG labdir
+ARG imagedir
+ARG user_name
+ARG password
+ARG apt_source
+ARG version
+LABEL version=$version
+ENV APT_SOURCE $apt_source
+RUN /usr/bin/apt-source.sh
+#
+# Install the system files found in the _system directory
+#
+ADD $labdir/$imagedir/sys_tar/sys.tar /
+ADD $labdir/sys_$lab.tar.gz /
+#
+RUN useradd -ms /bin/bash $user_name
+RUN echo "$user_name:$password" | chpasswd
+RUN adduser $user_name sudo
+#
+# Perform all root operations, e.g., "apt-get install" prior to the USER command.
+#
+USER root
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends apache2 php php-xml php-mbstring wget curl dirb && \
+    apt install apache2 php libapache2-mod-php php-mysqli php-gd php-mbstring php-fileinfo php-curl php-mysql -y && \
+    echo "deb https://apt-archive.postgresql.org/pub/repos/apt bionic-pgdg main" | sudo tee /etc/apt/sources.list.d/postgresql.list && \
+    apt-get install gnupg -y && \
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && \
+    apt-get update -y && \
+    apt-get install postgresql-9.6 -y && \
+    sed -i "s/^#listen_addresses = 'localhost'/listen_addresses = '*'/g" /etc/postgresql/9.6/main/postgresql.conf && \
+    sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.6/main/postgresql.conf && \
+echo "host    all             all             0.0.0.0/0            md5" | sudo tee -a /etc/postgresql/9.6/main/pg_hba.conf > /dev/null 
+     
+RUN service postgresql restart && \
+    sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" && \
+    sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER;" && \
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE template1 TO postgres;"
+
+
+
+USER $user_name
+ENV HOME /home/$user_name
+#
+# Install files in the user home directory
+#
+ADD $labdir/$imagedir/home_tar/home.tar $HOME
+RUN rm -f $HOME/home.tar
+ADD $labdir/$lab.tar.gz $HOME
+#
+# The first thing that executes on the container.
+#
+USER root
+# Start Apache in the foreground
+CMD ["/bin/bash", "-c", "service postgresql start && apachectl -D FOREGROUND"]
+
+
+

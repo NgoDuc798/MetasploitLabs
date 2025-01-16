@@ -1,0 +1,70 @@
+#
+# Labtainer Dockerfile
+#
+#  This is the default Labtainer Dockerfile template, please choose the appropriate
+#  base image below.
+#
+ARG registry
+FROM $registry/labtainer.base2
+#FROM $registry/labtainer.network
+#FROM $registry/labtainer.centos
+#FROM $registry/labtainer.lamp
+#
+ARG lab
+ARG labdir
+ARG imagedir
+ARG user_name
+ARG password
+ARG apt_source
+ARG version
+LABEL version=$version
+ENV APT_SOURCE $apt_source
+RUN /usr/bin/apt-source.sh
+#
+# Install the system files found in the _system directory
+#
+ADD $labdir/$imagedir/sys_tar/sys.tar /
+ADD $labdir/sys_$lab.tar.gz /
+#
+RUN useradd -ms /bin/bash $user_name
+RUN echo "$user_name:$password" | chpasswd
+RUN adduser $user_name sudo
+#
+# Perform all root operations, e.g., "apt-get install" prior to the USER command.
+#
+USER root
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends apache2 php php-xml php-mbstring wget curl firefox && \
+    apt-get install openjdk-8-jre-headless -y && \
+    apt-get clean && sudo rm -rf /var/lib/apt/lists/* && \
+    wget https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.2.tar.gz && \
+    tar xfz elasticsearch-1.4.2.tar.gz && \
+    mv elasticsearch-1.4.2 elasticsearch && \
+    mv elasticsearch /usr/local/ && \
+    chown -R ubuntu:ubuntu /usr/local/elasticsearch && \
+    chmod 777 -R /usr/local && \
+    chown 777 -R /usr/local && \
+    export ES_MIN_MEM=2g && \
+    export ES_MAX_MEM=4g 
+    
+
+USER $user_name
+ENV HOME /home/$user_name
+#
+# Install files in the user home directory
+#
+ADD $labdir/$imagedir/home_tar/home.tar $HOME
+RUN rm -f $HOME/home.tar
+ADD $labdir/$lab.tar.gz $HOME
+#
+# The first thing that executes on the container.
+#
+USER root
+RUN python3 /home/ubuntu/create_flag.py
+# Start Apache in the foreground
+CMD ["/bin/bash", "-c", "nohup /usr/local/elasticsearch/bin/elasticsearch -d && sleep 10 && curl -X PUT 'http://127.0.0.1:9200/blog/user/dilbert' -H 'Content-Type: application/json' -d '{\"name\" : \"Dilbert Brown\"}' && exec /sbin/init --log-target=journal 3>&1"]
+
+
+
+
